@@ -44,6 +44,32 @@ export type FrontendSample = {
   droppedFrameRatio: number | null;
 };
 
+export type BenchmarkWebVitalName =
+  | "CLS"
+  | "FCP"
+  | "FID"
+  | "INP"
+  | "LCP"
+  | "TTFB"
+  | "Next.js-hydration"
+  | "Next.js-route-change-to-render"
+  | "Next.js-render";
+
+export type BenchmarkWebVitalMetric = {
+  id: string;
+  name: BenchmarkWebVitalName;
+  value: number;
+  delta: number;
+  rating?: "good" | "needs-improvement" | "poor";
+  navigationType?: string;
+  entriesCount: number;
+  recordedAt: number;
+};
+
+export type BenchmarkWebVitalsSnapshot = Partial<
+  Record<BenchmarkWebVitalName, BenchmarkWebVitalMetric>
+>;
+
 export type DerivedMetrics = {
   ttftMs: number | null;
   firstVisibleTextMs: number | null;
@@ -86,6 +112,7 @@ export type BenchmarkReport = {
   chunkIntervals: number[];
   tokensPerSecondTimeline: Array<{ at: number; value: number }>;
   queueDepthTimeline: Array<{ at: number; value: number }>;
+  webVitals: BenchmarkWebVitalsSnapshot;
   environment: {
     viewport: { width: number; height: number } | null;
     userAgent: string | null;

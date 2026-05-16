@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/components/app-shell";
+import { WebVitals } from "@/components/web-vitals";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -28,6 +29,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${mono.variable}`}>
       <body className="font-[family-name:var(--font-display)]">
+        <WebVitals />
         <AppShell>{children}</AppShell>
       </body>
     </html>

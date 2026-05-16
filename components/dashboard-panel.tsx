@@ -10,6 +10,17 @@ import {
 } from "@/lib/benchmark-insights";
 import type { BenchmarkReport } from "@/lib/types";
 
+const WEB_VITAL_TARGETS: Record<string, string> = {
+  CLS: "<0.1",
+  FCP: "<1.8s",
+  INP: "<200ms",
+  LCP: "<2.5s",
+  TTFB: "<800ms",
+  "Next.js-hydration": "Lower is better",
+  "Next.js-route-change-to-render": "Lower is better",
+  "Next.js-render": "Lower is better"
+};
+
 export function DashboardPanel({
   report,
   status,
@@ -33,6 +44,9 @@ export function DashboardPanel({
     report?.frontendSamples
       .map((item) => item.heapMb)
       .filter((value): value is number => value !== null) ?? [];
+  const webVitals = Object.values(report?.webVitals ?? {}).sort((left, right) =>
+    left.name.localeCompare(right.name)
+  );
 
   return (
     <div className="grid gap-6">
@@ -110,6 +124,35 @@ export function DashboardPanel({
             </div>
           ) : null}
         </div>
+      </SectionCard>
+
+      <SectionCard title="Web Vitals" eyebrow="Page Health">
+        {webVitals.length ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {webVitals.map((metric) => (
+              <div
+                key={metric.id}
+                className="rounded-3xl border border-white/10 bg-black/25 p-4 text-sm leading-7 text-mist/74"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-semibold text-white">{metric.name}</div>
+                  <div className="rounded-full border border-white/10 px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-cyan">
+                    {metric.rating ?? "observed"}
+                  </div>
+                </div>
+                <p className="mt-3 text-white">
+                  {metric.name === "CLS" ? metric.value.toFixed(3) : `${metric.value.toFixed(1)}ms`}
+                </p>
+                <p>Target: {WEB_VITAL_TARGETS[metric.name] ?? "Lower is better"}</p>
+                <p>Navigation: {metric.navigationType ?? "n/a"}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm leading-7 text-mist/72">
+            Web Vitals have not been reported yet for this page load.
+          </p>
+        )}
       </SectionCard>
 
       <SectionCard title="What This Run Means" eyebrow="Interpretation">

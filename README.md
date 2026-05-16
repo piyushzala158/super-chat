@@ -4,6 +4,7 @@ Super Chat is a streaming UI benchmark cockpit for measuring how an AI chat fron
 
 - time to first token
 - first visible text
+- Core Web Vitals
 - tokens per second
 - queue depth
 - dropped frames
@@ -16,6 +17,7 @@ Super Chat is a streaming UI benchmark cockpit for measuring how an AI chat fron
 - `Stress Lab` mode for reproducible synthetic load
 - a live transcript view
 - a telemetry dashboard with charts and bottleneck hints
+- app-wide Web Vitals instrumentation
 - local report export for the latest completed run
 
 ## Getting Started
@@ -70,11 +72,21 @@ Older per-session report keys are cleared before a new report is written, which 
 
 The results page still supports opening a report by session id, but it now prefers the current stored report first for reload reliability.
 
+## Web Vitals
+
+The app captures Web Vitals through Next.js `useReportWebVitals` and stores the latest snapshot in memory for the current page load. That snapshot is included in each benchmark report so you can compare:
+
+- streaming-specific metrics like queue depth and dropped frames
+- standard page metrics like `LCP`, `INP`, `CLS`, `FCP`, and `TTFB`
+
+If debug mode is enabled, Web Vitals are also logged to the console with the `[benchmark][web-vitals]` prefix.
+
 ## Debugging Performance
 
 If you enable benchmark debug mode with `?benchmarkDebug=1` or `localStorage["benchmark-debug-perf"] = "1"`, the app logs:
 
 - flush timing
+- web vitals
 - markdown streaming preparation cost
 - React render durations
 - virtualized markdown render durations

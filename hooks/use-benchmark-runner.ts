@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { buildTokensTimeline, computeDerivedMetrics } from "@/lib/metrics";
 import { getPromptPreset, getStressPreset } from "@/lib/prompts";
 import { parseSseResponse } from "@/lib/sse";
+import { readWebVitalsSnapshot } from "@/lib/web-vitals";
 import type {
   BackendTiming,
   BenchmarkReport,
@@ -292,6 +293,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
           at: sample.at,
           value: sample.queueDepth
         })),
+        webVitals: readWebVitalsSnapshot(),
         environment: {
           viewport:
             typeof window !== "undefined"
