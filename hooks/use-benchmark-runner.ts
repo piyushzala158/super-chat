@@ -85,6 +85,7 @@ const BENCHMARK_PERF_DEBUG_KEY = "benchmark-debug-perf";
 const BENCHMARK_SELECTION_STORAGE_KEY = "benchmark-selection:v1";
 const BENCHMARK_REPORT_STORAGE_PREFIX = "benchmark-report:";
 const BENCHMARK_CURRENT_REPORT_STORAGE_KEY = `${BENCHMARK_REPORT_STORAGE_PREFIX}current`;
+const MIN_TRANSCRIPT_FLUSH_INTERVAL_MS = 32;
 const MAX_REPORTED_FPS = 120;
 const MIN_VALID_FRAME_DELTA_MS = 4;
 const MAX_VALID_FRAME_DELTA_MS = 1000;
@@ -163,6 +164,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
 
   const flushHandle = useRef<number | null>(null);
   const flushCountRef = useRef(0);
+  const lastFlushAtRef = useRef(0);
   const hasHydratedSelectionRef = useRef(false);
 
   useEffect(() => {
@@ -197,7 +199,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
   useEffect(() => {
     return () => {
       if (flushHandle.current !== null) {
-        cancelAnimationFrame(flushHandle.current);
+        clearTimeout(flushHandle.current);
       }
       abortRef.current?.abort();
     };
@@ -339,15 +341,21 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
 
   function scheduleFlush() {
     if (flushHandle.current !== null) return;
-    flushHandle.current = requestAnimationFrame(() => {
+    const elapsedSinceLastFlush = lastFlushAtRef.current
+      ? performance.now() - lastFlushAtRef.current
+      : MIN_TRANSCRIPT_FLUSH_INTERVAL_MS;
+    const delay = Math.max(0, MIN_TRANSCRIPT_FLUSH_INTERVAL_MS - elapsedSinceLastFlush);
+
+    flushHandle.current = window.setTimeout(() => {
       flushHandle.current = null;
       flushPendingNow();
-    });
+    }, delay);
   }
 
   function flushPendingNow() {
     const queue = pendingChunksRef.current.splice(0);
     if (!queue.length) return;
+    lastFlushAtRef.current = performance.now();
 
     const debugPerf = isBenchmarkPerfDebugEnabled();
     const flushId = ++flushCountRef.current;
@@ -452,6 +460,11 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       visibleSamples: []
     };
     flushCountRef.current = 0;
+    lastFlushAtRef.current = 0;
+    if (flushHandle.current !== null) {
+      clearTimeout(flushHandle.current);
+      flushHandle.current = null;
+    }
     bufferRef.current = "";
     pendingChunksRef.current = [];
     setMessages([
@@ -584,6 +597,11 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
 
   function stop() {
     abortRef.current?.abort();
+    if (flushHandle.current !== null) {
+      clearTimeout(flushHandle.current);
+      flushHandle.current = null;
+    }
+    flushPendingNow();
     metricsRef.current.completedAt = Date.now();
     setMessages((previous) =>
       previous.map((message) =>

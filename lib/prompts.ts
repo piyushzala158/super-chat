@@ -81,7 +81,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 64,
     chunkIntervalMs: 45,
     jitterPct: 0.25,
-    totalCharacters: 18000,
+    totalCharacters: 24000,
     contentType: "markdown"
   },
   {
@@ -91,7 +91,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 80,
     chunkIntervalMs: 35,
     jitterPct: 0.12,
-    totalCharacters: 22000,
+    totalCharacters: 28000,
     contentType: "code"
   },
   {
@@ -101,7 +101,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 72,
     chunkIntervalMs: 40,
     jitterPct: 0.2,
-    totalCharacters: 20000,
+    totalCharacters: 26000,
     contentType: "table"
   },
   {
@@ -111,7 +111,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 14,
     chunkIntervalMs: 12,
     jitterPct: 0.08,
-    totalCharacters: 12000,
+    totalCharacters: 16000,
     contentType: "mixed"
   },
   {
@@ -121,7 +121,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 48,
     chunkIntervalMs: 70,
     jitterPct: 0.3,
-    totalCharacters: 34000,
+    totalCharacters: 46000,
     contentType: "mixed"
   },
   {
@@ -131,7 +131,7 @@ export const STRESS_PRESETS: StressPreset[] = [
     chunkSize: 52,
     chunkIntervalMs: 18,
     jitterPct: 0.15,
-    totalCharacters: 48000,
+    totalCharacters: 64000,
     contentType: "mixed"
   }
 ];

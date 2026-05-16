@@ -111,6 +111,7 @@ function VirtualizedMarkdown({
   content: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const profilerEventCountRef = useRef(0);
   const blocks = useMemo(() => splitMarkdownIntoBlocks(content), [content]);
   const virtualizer = useVirtualizer({
     count: blocks.length,
@@ -118,39 +119,64 @@ function VirtualizedMarkdown({
     estimateSize: () => 280,
     overscan: 5
   });
+  const handleProfilerRender = (
+    id: string,
+    phase: "mount" | "update" | "nested-update",
+    actualDuration: number,
+    baseDuration: number
+  ) => {
+    if (!isBenchmarkPerfDebugEnabled()) return;
+    profilerEventCountRef.current += 1;
+
+    if (actualDuration < 6 && profilerEventCountRef.current > 5 && profilerEventCountRef.current % 20 !== 0) {
+      return;
+    }
+
+    console.debug("[benchmark][markdown-render]", {
+      id,
+      phase,
+      actualDurationMs: Number(actualDuration.toFixed(3)),
+      baseDurationMs: Number(baseDuration.toFixed(3)),
+      blockCount: blocks.length,
+      contentChars: content.length,
+      mode: "virtualized"
+    });
+  };
 
   return (
-    <div
-      ref={containerRef}
-      className="max-h-[62vh] overflow-auto rounded-2xl border border-white/10 bg-black/20 p-2"
-    >
+    <Profiler id={`VirtualizedMarkdown:${messageKey}`} onRender={handleProfilerRender}>
       <div
-        style={{
-          height: `${virtualizer.getTotalSize()}px`,
-          position: "relative"
-        }}
+        ref={containerRef}
+        className="max-h-[62vh] overflow-auto rounded-2xl border border-white/10 bg-black/20 p-2"
       >
-        {virtualizer.getVirtualItems().map((item) => {
-          const block = blocks[item.index] ?? "";
-          return (
-            <div
-              key={`${messageKey}-block-${item.index}`}
-              data-index={item.index}
-              ref={virtualizer.measureElement}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${item.start}px)`
-              }}
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{block}</ReactMarkdown>
-            </div>
-          );
-        })}
+        <div
+          style={{
+            height: `${virtualizer.getTotalSize()}px`,
+            position: "relative"
+          }}
+        >
+          {virtualizer.getVirtualItems().map((item) => {
+            const block = blocks[item.index] ?? "";
+            return (
+              <div
+                key={`${messageKey}-block-${item.index}`}
+                data-index={item.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  width: "100%",
+                  transform: `translateY(${item.start}px)`
+                }}
+              >
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block}</ReactMarkdown>
+              </div>
+            );
+          })}
+        </div>
       </div>
-    </div>
+    </Profiler>
   );
 }
 
@@ -168,6 +194,7 @@ function StreamingAssistantContent({
     nextBlockId: 0,
     tail: ""
   });
+  const profilerEventCountRef = useRef(0);
 
   const cache = cacheRef.current;
   const debugPerf = isBenchmarkPerfDebugEnabled();
@@ -218,19 +245,47 @@ function StreamingAssistantContent({
     }
   }
 
+  const handleProfilerRender = (
+    id: string,
+    phase: "mount" | "update" | "nested-update",
+    actualDuration: number,
+    baseDuration: number
+  ) => {
+    if (!isBenchmarkPerfDebugEnabled()) return;
+    profilerEventCountRef.current += 1;
+
+    if (actualDuration < 6 && profilerEventCountRef.current > 5 && profilerEventCountRef.current % 20 !== 0) {
+      return;
+    }
+
+    console.debug("[benchmark][markdown-render]", {
+      id,
+      phase,
+      actualDurationMs: Number(actualDuration.toFixed(3)),
+      baseDurationMs: Number(baseDuration.toFixed(3)),
+      contentChars: content.length,
+      stableChars: cacheRef.current.stableLength,
+      tailChars: cacheRef.current.tail.length,
+      blockCount: cacheRef.current.blocks.length,
+      mode: "streaming"
+    });
+  };
+
   return (
-    <div className="prose-benchmark">
-      {cacheRef.current.blocks.map((block) => (
-        <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>
-          {block.content}
-        </ReactMarkdown>
-      ))}
-      {cacheRef.current.tail ? (
-        <pre className="whitespace-pre-wrap break-words text-sm leading-7 text-mist/88">
-          {cacheRef.current.tail}
-        </pre>
-      ) : null}
-    </div>
+    <Profiler id={`StreamingMarkdown:${messageKey}`} onRender={handleProfilerRender}>
+      <div className="prose-benchmark">
+        {cacheRef.current.blocks.map((block) => (
+          <ReactMarkdown key={block.key} remarkPlugins={[remarkGfm]}>
+            {block.content}
+          </ReactMarkdown>
+        ))}
+        {cacheRef.current.tail ? (
+          <pre className="whitespace-pre-wrap break-words text-sm leading-7 text-mist/88">
+            {cacheRef.current.tail}
+          </pre>
+        ) : null}
+      </div>
+    </Profiler>
   );
 }
 
