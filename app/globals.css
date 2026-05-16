@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply min-h-screen bg-ink text-mist antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(111, 243, 255, 0.14), transparent 32%),
+    radial-gradient(circle at top right, rgba(212, 255, 106, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(6, 17, 29, 0.96), rgba(4, 10, 18, 1));
+}
+
+* {
+  scrollbar-color: rgba(111, 243, 255, 0.38) transparent;
+}
+
+.bg-grid {
+  background-size: 42px 42px;
+}
+
+.prose-benchmark {
+  @apply text-sm leading-7 text-mist/90;
+}
+
+.prose-benchmark h1,
+.prose-benchmark h2,
+.prose-benchmark h3 {
+  @apply mt-4 text-mist;
+}
+
+.prose-benchmark code {
+  @apply rounded bg-white/10 px-1.5 py-0.5 text-cyan;
+}
+
+.prose-benchmark pre {
+  @apply overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-xs;
+}
+
+.prose-benchmark table {
+  @apply w-full border-collapse overflow-hidden rounded-2xl text-xs;
+}
+
+.prose-benchmark th,
+.prose-benchmark td {
+  @apply border border-white/10 px-3 py-2 text-left;
+}
