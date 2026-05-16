@@ -23,7 +23,7 @@ export function FeatureGrid() {
   return (
     <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
-        <SectionCard key={card.title} title={card.title}>
+        <SectionCard key={card.title} title={card.title} className="min-h-48">
           <p className="text-sm leading-7 text-mist/75">{card.copy}</p>
         </SectionCard>
       ))}

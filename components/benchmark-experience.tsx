@@ -23,8 +23,13 @@ export function BenchmarkExperience({
   const runner = useBenchmarkRunner({ mode });
 
   const controlsLabel = useMemo(
-    () => (mode === "live" ? "Gemini Live Config" : "Synthetic Stress Config"),
-    [mode]
+    () =>
+      mode === "live"
+        ? runner.selection.provider === "google-ai-studio"
+          ? "Google AI Studio Config"
+          : "OpenRouter Config"
+        : "Synthetic Stress Config",
+    [mode, runner.selection.provider]
   );
 
   return (

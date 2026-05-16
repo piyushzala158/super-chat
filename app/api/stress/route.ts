@@ -30,23 +30,25 @@ export async function POST(request: Request) {
     async start(controller) {
       const encoder = new TextEncoder();
       const timing: BackendTiming = {
+        provider: "synthetic",
         requestValidationMs: performance.now() - routeStart,
         providerStartMs: 0,
         providerFirstChunkMs: null,
         providerCompleteMs: null,
         transformOverheadMs: 0,
-        flushIntervalMs: null,
+        avgFlushIntervalMs: null,
         chunkCount: 0
       };
 
-      controller.enqueue(
-        encoder.encode(
-          encodeSseEvent("session_start", {
-            sessionId,
-            mode: "synthetic",
-            model: "synthetic-generator",
-            preset: preset.id,
-            startedAt
+        controller.enqueue(
+          encoder.encode(
+            encodeSseEvent("session_start", {
+              sessionId,
+              mode: "synthetic",
+              provider: "synthetic",
+              model: "synthetic-generator",
+              preset: preset.id,
+              startedAt
           })
         )
       );
@@ -54,6 +56,8 @@ export async function POST(request: Request) {
       let index = 0;
       let sequence = 0;
       let lastFlush = performance.now();
+      let flushGapTotal = 0;
+      let flushGapCount = 0;
 
       while (index < content.length) {
         const delta = content.slice(index, index + chunkSize);
@@ -75,7 +79,9 @@ export async function POST(request: Request) {
         );
 
         const now = performance.now();
-        timing.flushIntervalMs = now - lastFlush;
+        flushGapTotal += now - lastFlush;
+        flushGapCount += 1;
+        timing.avgFlushIntervalMs = flushGapTotal / flushGapCount;
         lastFlush = now;
 
         const jitter = chunkIntervalMs * jitterPct;

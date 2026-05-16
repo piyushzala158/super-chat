@@ -13,9 +13,10 @@ html {
 body {
   @apply min-h-screen bg-ink text-mist antialiased;
   background-image:
-    radial-gradient(circle at top left, rgba(111, 243, 255, 0.14), transparent 32%),
-    radial-gradient(circle at top right, rgba(212, 255, 106, 0.12), transparent 24%),
-    linear-gradient(180deg, rgba(6, 17, 29, 0.96), rgba(4, 10, 18, 1));
+    radial-gradient(circle at 12% 14%, rgba(255, 122, 102, 0.14), transparent 26%),
+    radial-gradient(circle at 88% 12%, rgba(111, 243, 255, 0.16), transparent 28%),
+    radial-gradient(circle at 50% 100%, rgba(212, 255, 106, 0.08), transparent 30%),
+    linear-gradient(180deg, #07111d 0%, #07141f 45%, #050c14 100%);
 }
 
 * {
@@ -24,6 +25,14 @@ body {
 
 .bg-grid {
   background-size: 42px 42px;
+}
+
+.panel-noise {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.03), rgba(255,255,255,0.03)),
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.05) 0 1px, transparent 1px),
+    radial-gradient(circle at 80% 60%, rgba(255,255,255,0.04) 0 1px, transparent 1px);
+  background-size: auto, 28px 28px, 34px 34px;
 }
 
 .prose-benchmark {
@@ -36,12 +45,45 @@ body {
   @apply mt-4 text-mist;
 }
 
+.prose-benchmark h1 {
+  @apply text-2xl font-semibold;
+}
+
+.prose-benchmark h2 {
+  @apply text-xl font-semibold;
+}
+
+.prose-benchmark h3 {
+  @apply text-lg font-medium;
+}
+
+.prose-benchmark p {
+  @apply my-3;
+}
+
+.prose-benchmark ul,
+.prose-benchmark ol {
+  @apply my-3 pl-5;
+}
+
+.prose-benchmark li {
+  @apply my-1;
+}
+
 .prose-benchmark code {
   @apply rounded bg-white/10 px-1.5 py-0.5 text-cyan;
 }
 
 .prose-benchmark pre {
   @apply overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-xs;
+}
+
+.prose-benchmark pre code {
+  @apply bg-transparent p-0 text-cyan;
+}
+
+.prose-benchmark blockquote {
+  @apply my-4 border-l-2 border-coral/70 pl-4 text-mist/80;
 }
 
 .prose-benchmark table {

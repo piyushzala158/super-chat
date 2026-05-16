@@ -8,7 +8,10 @@ import type {
   BackendTiming,
   BenchmarkReport,
   ChunkEvent,
+  GoogleLiveConfig,
+  LiveProvider,
   MetricEvent,
+  OpenRouterLiveConfig,
   PromptPresetId,
   FrontendSample,
   SessionEndEvent,
@@ -25,9 +28,11 @@ type Message = {
 };
 
 type RunnerSelection = {
-  model: string;
+  provider: LiveProvider;
   promptPreset: PromptPresetId;
   customPrompt: string;
+  google: GoogleLiveConfig;
+  openrouter: OpenRouterLiveConfig;
   stressPreset: string;
   chunkSize: number;
   chunkIntervalMs: number;
@@ -35,14 +40,56 @@ type RunnerSelection = {
 };
 
 const initialSelection: RunnerSelection = {
-  model: "gemini-2.5-flash",
+  provider: "google-ai-studio",
   promptPreset: "structured-markdown",
   customPrompt: getPromptPreset("structured-markdown").prompt,
+  google: {
+    apiKey: "",
+    model: "gemini-2.5-flash",
+    systemInstruction: "",
+    temperature: 1,
+    topP: 0.95,
+    topK: 40,
+    maxOutputTokens: 1024,
+    candidateCount: 1,
+    stopSequences: "",
+    seed: null,
+    responseMimeType: "text/plain",
+    presencePenalty: 0,
+    frequencyPenalty: 0
+  },
+  openrouter: {
+    apiKey: "",
+    model: "openrouter/free",
+    customModel: "",
+    temperature: 1,
+    topP: 1,
+    topK: 0,
+    maxTokens: 1024,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    repetitionPenalty: 1,
+    minP: 0,
+    topA: 0,
+    seed: null,
+    stop: "",
+    jsonMode: false
+  },
   stressPreset: "long-markdown",
   chunkSize: getStressPreset("long-markdown").chunkSize,
   chunkIntervalMs: getStressPreset("long-markdown").chunkIntervalMs,
   jitterPct: getStressPreset("long-markdown").jitterPct
 };
+
+const BENCHMARK_PERF_DEBUG_KEY = "benchmark-debug-perf";
+
+function isBenchmarkPerfDebugEnabled() {
+  if (typeof window === "undefined") return false;
+  return (
+    window.localStorage.getItem(BENCHMARK_PERF_DEBUG_KEY) === "1" ||
+    window.location.search.includes("benchmarkDebug=1")
+  );
+}
 
 export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
   const [selection, setSelection] = useState<RunnerSelection>(initialSelection);
@@ -57,7 +104,8 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
     sessionId: crypto.randomUUID(),
     startedAt: 0,
     sessionStartedAt: 0,
-    model: selection.model,
+    provider: selection.provider as LiveProvider | "synthetic",
+    model: selection.google.model,
     preset: selection.promptPreset as string,
     firstChunkAt: null as number | null,
     firstVisibleAt: null as number | null,
@@ -76,6 +124,27 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
   });
 
   const flushHandle = useRef<number | null>(null);
+  const flushCountRef = useRef(0);
+
+  useEffect(() => {
+    if (mode !== "live") return;
+    const savedGoogleKey = window.localStorage.getItem("benchmark-gemini-api-key");
+    const savedOpenRouterKey = window.localStorage.getItem("benchmark-openrouter-api-key");
+    setSelection((previous) => ({
+      ...previous,
+      google: { ...previous.google, apiKey: savedGoogleKey ?? previous.google.apiKey },
+      openrouter: {
+        ...previous.openrouter,
+        apiKey: savedOpenRouterKey ?? previous.openrouter.apiKey
+      }
+    }));
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "live") return;
+    window.localStorage.setItem("benchmark-gemini-api-key", selection.google.apiKey);
+    window.localStorage.setItem("benchmark-openrouter-api-key", selection.openrouter.apiKey);
+  }, [mode, selection.google.apiKey, selection.openrouter.apiKey]);
 
   useEffect(() => {
     return () => {
@@ -151,6 +220,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
         session: {
           id: metrics.sessionId,
           mode,
+          provider: metrics.provider,
           model: metrics.model,
           preset: metrics.preset as BenchmarkReport["session"]["preset"],
           startedAt: metrics.sessionStartedAt
@@ -203,9 +273,16 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
     const queue = pendingChunksRef.current.splice(0);
     if (!queue.length) return;
 
+    const debugPerf = isBenchmarkPerfDebugEnabled();
+    const flushId = ++flushCountRef.current;
     const start = performance.now();
+    const previousLength = bufferRef.current.length;
     const delta = queue.map((item) => item.delta).join("");
+    const joinMs = performance.now() - start;
+
+    const appendStart = performance.now();
     bufferRef.current += delta;
+    const appendMs = performance.now() - appendStart;
     metricsRef.current.charactersReceived += delta.length;
     metricsRef.current.visibleSamples.push({
       at: Date.now(),
@@ -215,6 +292,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       metricsRef.current.firstVisibleAt = Date.now();
     }
 
+    const dispatchStart = performance.now();
     startTransition(() => {
       const commitStart = performance.now();
       setMessages((previous) =>
@@ -229,8 +307,24 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       );
       metricsRef.current.commitDurations.push(performance.now() - commitStart);
     });
+    const dispatchMs = performance.now() - dispatchStart;
 
-    metricsRef.current.chunkProcessMs.push(performance.now() - start);
+    const totalMs = performance.now() - start;
+    metricsRef.current.chunkProcessMs.push(totalMs);
+
+    if (debugPerf && (flushId <= 5 || flushId % 25 === 0 || queue.length >= 8 || totalMs > 4)) {
+      console.debug("[benchmark][flush]", {
+        flushId,
+        queueDepth: queue.length,
+        deltaChars: delta.length,
+        bufferCharsBefore: previousLength,
+        bufferCharsAfter: bufferRef.current.length,
+        joinMs: Number(joinMs.toFixed(3)),
+        appendMs: Number(appendMs.toFixed(3)),
+        dispatchMs: Number(dispatchMs.toFixed(3)),
+        totalMs: Number(totalMs.toFixed(3))
+      });
+    }
   }
 
   async function start() {
@@ -249,7 +343,15 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       sessionId: crypto.randomUUID(),
       startedAt: Date.now(),
       sessionStartedAt: Date.now(),
-      model: mode === "live" ? selection.model : "synthetic-generator",
+      provider: mode === "live" ? selection.provider : "synthetic",
+      model:
+        mode === "live"
+          ? selection.provider === "google-ai-studio"
+            ? selection.google.model
+            : selection.openrouter.model === "custom"
+              ? selection.openrouter.customModel || "custom-openrouter-model"
+              : selection.openrouter.model
+          : "synthetic-generator",
       preset: mode === "live" ? promptPreset.id : stressPreset.id,
       firstChunkAt: null,
       firstVisibleAt: null,
@@ -266,6 +368,7 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       backendTiming: null,
       visibleSamples: []
     };
+    flushCountRef.current = 0;
     bufferRef.current = "";
     pendingChunksRef.current = [];
     setMessages([
@@ -286,9 +389,11 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
     const payload =
       mode === "live"
         ? {
-            model: selection.model,
+            provider: selection.provider,
             prompt: selection.customPrompt,
-            preset: selection.promptPreset
+            preset: selection.promptPreset,
+            googleConfig: selection.google,
+            openrouterConfig: selection.openrouter
           }
         : {
             presetId: selection.stressPreset,
@@ -321,6 +426,8 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
               const data = envelope.data as SessionStartEvent;
               metricsRef.current.sessionId = data.sessionId;
               metricsRef.current.sessionStartedAt = data.startedAt;
+              metricsRef.current.provider = data.provider;
+              metricsRef.current.model = data.model;
             }
             break;
           case "chunk": {
@@ -349,12 +456,13 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
               const data = envelope.data as MetricEvent;
               if (!data.backendTiming) break;
               metricsRef.current.backendTiming = {
+                provider: data.backendTiming.provider ?? metricsRef.current.provider,
                 requestValidationMs: data.backendTiming.requestValidationMs ?? 0,
                 providerStartMs: data.backendTiming.providerStartMs ?? 0,
                 providerFirstChunkMs: data.backendTiming.providerFirstChunkMs ?? null,
                 providerCompleteMs: data.backendTiming.providerCompleteMs ?? null,
                 transformOverheadMs: data.backendTiming.transformOverheadMs ?? 0,
-                flushIntervalMs: data.backendTiming.flushIntervalMs ?? null,
+                avgFlushIntervalMs: data.backendTiming.avgFlushIntervalMs ?? null,
                 chunkCount: data.backendTiming.chunkCount ?? 0
               };
             }

@@ -19,6 +19,7 @@ export function ResultsView({ id }: { id: string }) {
   const summary = useMemo(() => {
     if (!report) return null;
     return [
+      `Provider: ${report.session.provider}`,
       `Model: ${report.session.model}`,
       `Mode: ${report.session.mode}`,
       `Prompt preset: ${report.session.preset}`,

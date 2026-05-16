@@ -1,4 +1,5 @@
 export type SessionMode = "live" | "synthetic";
+export type LiveProvider = "google-ai-studio" | "openrouter";
 
 export type PromptPresetId =
   | "short-answer"
@@ -16,12 +17,13 @@ export type StressPresetId =
   | "ten-k-replay";
 
 export type BackendTiming = {
+  provider: LiveProvider | "synthetic";
   requestValidationMs: number;
   providerStartMs: number;
   providerFirstChunkMs: number | null;
   providerCompleteMs: number | null;
   transformOverheadMs: number;
-  flushIntervalMs: number | null;
+  avgFlushIntervalMs: number | null;
   chunkCount: number;
 };
 
@@ -69,6 +71,7 @@ export type DerivedMetrics = {
 export type BenchmarkSession = {
   id: string;
   mode: SessionMode;
+  provider: LiveProvider | "synthetic";
   model: string;
   preset: PromptPresetId | StressPresetId;
   startedAt: number;
@@ -93,6 +96,7 @@ export type BenchmarkReport = {
 export type SessionStartEvent = {
   sessionId: string;
   mode: SessionMode;
+  provider: LiveProvider | "synthetic";
   model: string;
   preset: string;
   startedAt: number;
@@ -144,4 +148,38 @@ export type StressPreset = {
   jitterPct: number;
   totalCharacters: number;
   contentType: "markdown" | "code" | "table" | "mixed";
+};
+
+export type GoogleLiveConfig = {
+  apiKey: string;
+  model: string;
+  systemInstruction: string;
+  temperature: number;
+  topP: number;
+  topK: number;
+  maxOutputTokens: number;
+  candidateCount: number;
+  stopSequences: string;
+  seed: number | null;
+  responseMimeType: "text/plain" | "application/json";
+  presencePenalty: number;
+  frequencyPenalty: number;
+};
+
+export type OpenRouterLiveConfig = {
+  apiKey: string;
+  model: string;
+  customModel: string;
+  temperature: number;
+  topP: number;
+  topK: number;
+  maxTokens: number;
+  frequencyPenalty: number;
+  presencePenalty: number;
+  repetitionPenalty: number;
+  minP: number;
+  topA: number;
+  seed: number | null;
+  stop: string;
+  jsonMode: boolean;
 };

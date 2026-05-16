@@ -21,6 +21,21 @@ export const GEMINI_MODELS = [
   }
 ] as const;
 
+export const OPENROUTER_MODELS = [
+  {
+    id: "openrouter/free",
+    label: "OpenRouter Free Router",
+    description: "Automatically routes to an available free model.",
+    recommended: true
+  },
+  {
+    id: "custom",
+    label: "Custom Model ID",
+    description: "Paste any exact OpenRouter model ID, including :free variants.",
+    recommended: false
+  }
+] as const;
+
 export const PROMPT_PRESETS: Array<{
   id: PromptPresetId;
   label: string;
