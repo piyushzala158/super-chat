@@ -6,13 +6,19 @@ import { SectionCard } from "@/components/section-card";
 import { serializeReport } from "@/lib/metrics";
 import type { BenchmarkReport } from "@/lib/types";
 
+const BENCHMARK_REPORT_STORAGE_PREFIX = "benchmark-report:";
+const BENCHMARK_CURRENT_REPORT_STORAGE_KEY = `${BENCHMARK_REPORT_STORAGE_PREFIX}current`;
+
 export function ResultsView({ id }: { id: string }) {
   const [report, setReport] = useState<BenchmarkReport | null>(null);
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(`benchmark-report:${id}`);
+    const raw =
+      window.localStorage.getItem(BENCHMARK_CURRENT_REPORT_STORAGE_KEY) ??
+      window.localStorage.getItem(`${BENCHMARK_REPORT_STORAGE_PREFIX}${id}`);
     if (raw) {
-      setReport(JSON.parse(raw) as BenchmarkReport);
+      const parsed = JSON.parse(raw) as BenchmarkReport;
+      setReport(parsed);
     }
   }, [id]);
 

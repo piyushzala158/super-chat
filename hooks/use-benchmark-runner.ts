@@ -82,9 +82,13 @@ const initialSelection: RunnerSelection = {
 };
 
 const BENCHMARK_PERF_DEBUG_KEY = "benchmark-debug-perf";
+const BENCHMARK_SELECTION_STORAGE_KEY = "benchmark-selection:v1";
+const BENCHMARK_REPORT_STORAGE_PREFIX = "benchmark-report:";
+const BENCHMARK_CURRENT_REPORT_STORAGE_KEY = `${BENCHMARK_REPORT_STORAGE_PREFIX}current`;
 const MAX_REPORTED_FPS = 120;
 const MIN_VALID_FRAME_DELTA_MS = 4;
 const MAX_VALID_FRAME_DELTA_MS = 1000;
+const REPORT_STORAGE_SAMPLE_CAP = 1200;
 
 function isBenchmarkPerfDebugEnabled() {
   if (typeof window === "undefined") return false;
@@ -92,6 +96,37 @@ function isBenchmarkPerfDebugEnabled() {
     window.localStorage.getItem(BENCHMARK_PERF_DEBUG_KEY) === "1" ||
     window.location.search.includes("benchmarkDebug=1")
   );
+}
+
+function sampleArray<T>(values: T[], cap: number) {
+  if (values.length <= cap) return values;
+  const stride = Math.ceil(values.length / cap);
+  const sampled: T[] = [];
+  for (let index = 0; index < values.length; index += stride) {
+    sampled.push(values[index]);
+  }
+  return sampled;
+}
+
+function compactReportForStorage(report: BenchmarkReport): BenchmarkReport {
+  return {
+    ...report,
+    frontendSamples: sampleArray(report.frontendSamples, REPORT_STORAGE_SAMPLE_CAP),
+    chunkIntervals: sampleArray(report.chunkIntervals, REPORT_STORAGE_SAMPLE_CAP),
+    tokensPerSecondTimeline: sampleArray(report.tokensPerSecondTimeline, REPORT_STORAGE_SAMPLE_CAP),
+    queueDepthTimeline: sampleArray(report.queueDepthTimeline, REPORT_STORAGE_SAMPLE_CAP)
+  };
+}
+
+function clearStoredBenchmarkReports() {
+  if (typeof window === "undefined") return;
+
+  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.localStorage.key(index);
+    if (key && key.startsWith(BENCHMARK_REPORT_STORAGE_PREFIX)) {
+      window.localStorage.removeItem(key);
+    }
+  }
 }
 
 export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
@@ -128,26 +163,36 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
 
   const flushHandle = useRef<number | null>(null);
   const flushCountRef = useRef(0);
+  const hasHydratedSelectionRef = useRef(false);
 
   useEffect(() => {
-    if (mode !== "live") return;
-    const savedGoogleKey = window.localStorage.getItem("benchmark-gemini-api-key");
-    const savedOpenRouterKey = window.localStorage.getItem("benchmark-openrouter-api-key");
-    setSelection((previous) => ({
-      ...previous,
-      google: { ...previous.google, apiKey: savedGoogleKey ?? previous.google.apiKey },
-      openrouter: {
-        ...previous.openrouter,
-        apiKey: savedOpenRouterKey ?? previous.openrouter.apiKey
-      }
-    }));
-  }, [mode]);
+    if (typeof window === "undefined") return;
+    const raw = window.localStorage.getItem(BENCHMARK_SELECTION_STORAGE_KEY);
+    if (!raw) {
+      hasHydratedSelectionRef.current = true;
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<RunnerSelection>;
+      setSelection((previous) => ({
+        ...previous,
+        ...parsed,
+        google: { ...previous.google, ...(parsed.google ?? {}) },
+        openrouter: { ...previous.openrouter, ...(parsed.openrouter ?? {}) }
+      }));
+    } catch {
+      window.localStorage.removeItem(BENCHMARK_SELECTION_STORAGE_KEY);
+    } finally {
+      hasHydratedSelectionRef.current = true;
+    }
+  }, []);
 
   useEffect(() => {
-    if (mode !== "live") return;
-    window.localStorage.setItem("benchmark-gemini-api-key", selection.google.apiKey);
-    window.localStorage.setItem("benchmark-openrouter-api-key", selection.openrouter.apiKey);
-  }, [mode, selection.google.apiKey, selection.openrouter.apiKey]);
+    if (typeof window === "undefined") return;
+    if (!hasHydratedSelectionRef.current) return;
+    window.localStorage.setItem(BENCHMARK_SELECTION_STORAGE_KEY, JSON.stringify(selection));
+  }, [selection]);
 
   useEffect(() => {
     return () => {
@@ -258,10 +303,34 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
         }
       };
 
-      window.localStorage.setItem(
-        `benchmark-report:${nextReport.session.id}`,
-        JSON.stringify(nextReport)
-      );
+      const fullPayload = JSON.stringify(nextReport);
+      try {
+        clearStoredBenchmarkReports();
+        window.localStorage.setItem(BENCHMARK_CURRENT_REPORT_STORAGE_KEY, fullPayload);
+      } catch {
+        const compacted = compactReportForStorage(nextReport);
+        const compactedPayload = JSON.stringify(compacted);
+        try {
+          clearStoredBenchmarkReports();
+          window.localStorage.setItem(BENCHMARK_CURRENT_REPORT_STORAGE_KEY, compactedPayload);
+          if (isBenchmarkPerfDebugEnabled()) {
+            console.warn("[benchmark][report-storage]", {
+              mode: "compacted",
+              originalBytes: fullPayload.length,
+              compactedBytes: compactedPayload.length,
+              cap: REPORT_STORAGE_SAMPLE_CAP
+            });
+          }
+        } catch {
+          if (isBenchmarkPerfDebugEnabled()) {
+            console.warn("[benchmark][report-storage]", {
+              mode: "skipped",
+              reason: "quota_exceeded",
+              originalBytes: fullPayload.length
+            });
+          }
+        }
+      }
       setReport(nextReport);
       return nextReport;
     },
@@ -282,6 +351,10 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
 
     const debugPerf = isBenchmarkPerfDebugEnabled();
     const flushId = ++flushCountRef.current;
+    const flushTimerLabel = `[benchmark][flush#${flushId}]`;
+    if (debugPerf) {
+      console.time(flushTimerLabel);
+    }
     const start = performance.now();
     const previousLength = bufferRef.current.length;
     const delta = queue.map((item) => item.delta).join("");
@@ -331,6 +404,9 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
         dispatchMs: Number(dispatchMs.toFixed(3)),
         totalMs: Number(totalMs.toFixed(3))
       });
+    }
+    if (debugPerf) {
+      console.timeEnd(flushTimerLabel);
     }
   }
 

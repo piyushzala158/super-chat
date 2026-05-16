@@ -30,6 +30,8 @@ type StreamingMarkdownCache = {
 };
 
 const BENCHMARK_PERF_DEBUG_KEY = "benchmark-debug-perf";
+const LARGE_MARKDOWN_VIRTUALIZE_THRESHOLD = 80000;
+const VIRTUAL_MARKDOWN_BLOCK_SIZE = 6000;
 
 function isBenchmarkPerfDebugEnabled() {
   if (typeof window === "undefined") return false;
@@ -79,6 +81,77 @@ function rebuildStreamingCache(messageKey: string, content: string) {
     nextBlockId: stableContent ? 1 : 0,
     tail: content.slice(stableLength)
   } satisfies StreamingMarkdownCache;
+}
+
+function splitMarkdownIntoBlocks(content: string, targetSize = VIRTUAL_MARKDOWN_BLOCK_SIZE) {
+  if (!content) return [];
+  const blocks: string[] = [];
+  let cursor = 0;
+
+  while (cursor < content.length) {
+    const hardStop = Math.min(cursor + targetSize, content.length);
+    let splitAt = content.lastIndexOf("\n\n", hardStop);
+    if (splitAt <= cursor) {
+      splitAt = hardStop;
+    } else {
+      splitAt += 2;
+    }
+    blocks.push(content.slice(cursor, splitAt));
+    cursor = splitAt;
+  }
+
+  return blocks;
+}
+
+function VirtualizedMarkdown({
+  messageKey,
+  content
+}: {
+  messageKey: string;
+  content: string;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const blocks = useMemo(() => splitMarkdownIntoBlocks(content), [content]);
+  const virtualizer = useVirtualizer({
+    count: blocks.length,
+    getScrollElement: () => containerRef.current,
+    estimateSize: () => 280,
+    overscan: 5
+  });
+
+  return (
+    <div
+      ref={containerRef}
+      className="max-h-[62vh] overflow-auto rounded-2xl border border-white/10 bg-black/20 p-2"
+    >
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          position: "relative"
+        }}
+      >
+        {virtualizer.getVirtualItems().map((item) => {
+          const block = blocks[item.index] ?? "";
+          return (
+            <div
+              key={`${messageKey}-block-${item.index}`}
+              data-index={item.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${item.start}px)`
+              }}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{block}</ReactMarkdown>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function StreamingAssistantContent({
@@ -272,6 +345,8 @@ export function TranscriptPane({
                     {row.markdown ? (
                       row.streaming ? (
                         <StreamingAssistantContent messageKey={row.key} content={row.content} />
+                      ) : row.content.length >= LARGE_MARKDOWN_VIRTUALIZE_THRESHOLD ? (
+                        <VirtualizedMarkdown messageKey={row.key} content={row.content} />
                       ) : (
                         <div className="prose-benchmark">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{row.content}</ReactMarkdown>
