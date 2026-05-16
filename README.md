@@ -211,7 +211,7 @@ This is used when persisting reports so large benchmark runs do not overflow bro
 
 ### Derived Metrics Example
 
-The metrics layer in [lib/metrics.ts](/Users/piyushzala/Desktop/my%20projects/super-caht/lib/metrics.ts) converts raw timings into benchmark-friendly numbers:
+The metrics layer in [lib/metrics.ts](/Users/piyushzala/Desktop/my%20projects/super-caht/lib/metrics.ts) converts raw timings into benchmark-friendly numbers. This excerpt shows how the report turns raw timings into the numbers the dashboard uses:
 
 ```ts
 export function computeDerivedMetrics(input: {
@@ -240,7 +240,11 @@ export function computeDerivedMetrics(input: {
     firstVisibleTextMs: firstVisibleAt ? firstVisibleAt - startedAt : null,
     totalDurationMs,
     estimatedTokensPerSecond,
-    backpressureActive: maxQueueDepth >= 4 && queueAvg > 1 && avgIncomingGap > 0
+    backpressureActive:
+      maxQueueDepth >= 4 &&
+      queueAvg > 1 &&
+      avgIncomingGap > 0 &&
+      (average(chunkProcessMs) ?? 0) > avgIncomingGap
   };
 }
 ```
