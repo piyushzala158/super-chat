@@ -82,6 +82,9 @@ const initialSelection: RunnerSelection = {
 };
 
 const BENCHMARK_PERF_DEBUG_KEY = "benchmark-debug-perf";
+const MAX_REPORTED_FPS = 120;
+const MIN_VALID_FRAME_DELTA_MS = 4;
+const MAX_VALID_FRAME_DELTA_MS = 1000;
 
 function isBenchmarkPerfDebugEnabled() {
   if (typeof window === "undefined") return false;
@@ -167,10 +170,14 @@ export function useBenchmarkRunner({ mode }: { mode: SessionMode }) {
       const now = performance.now();
       const delta = now - lastFrameAt;
       lastFrameAt = now;
+      if (delta < MIN_VALID_FRAME_DELTA_MS || delta > MAX_VALID_FRAME_DELTA_MS) {
+        rafId = requestAnimationFrame(sample);
+        return;
+      }
       totalFrames += 1;
       if (delta > 20) droppedFrames += 1;
 
-      const fps = delta > 0 ? 1000 / delta : null;
+      const fps = delta > 0 ? Math.min(MAX_REPORTED_FPS, 1000 / delta) : null;
       const heap = "memory" in performance
         ? ((performance as Performance & { memory?: { usedJSHeapSize: number } }).memory
             ?.usedJSHeapSize ?? 0) /

@@ -44,7 +44,7 @@ function verdict(health: Health, great: string, ok: string, poor: string) {
 
 export function buildMetricInsights(derived: DerivedMetrics | undefined) {
   const ttftHealth = classifyLowBetter(derived?.ttftMs ?? null, 900, 1800);
-  const fpsHealth = classifyHighBetter(derived?.averageFps ?? null, 55, 40);
+  const fpsHealth = classifyHighBetter(derived?.averageFps ?? null, 60, 45);
   const chunkGapHealth = classifyLowBetter(derived?.avgChunkIntervalMs ?? null, 60, 140);
   const queueHealth =
     (derived?.backpressureActive ?? false) || (derived?.maxQueueDepth ?? 0) > 6
@@ -108,12 +108,12 @@ export function buildMetricInsights(derived: DerivedMetrics | undefined) {
     {
       label: "FPS",
       value: derived?.averageFps ? derived.averageFps.toFixed(1) : "n/a",
-      benchmark: "55+ great, 40+ acceptable",
+      benchmark: "60+ great, 45+ acceptable",
       helper: verdict(
         fpsHealth,
-        "Rendering is smooth and should feel premium.",
-        "Mostly okay, but heavier streams may show some softness.",
-        "The UI is dropping smoothness under load."
+        "Rendering smoothness is in a strong range for chat UX.",
+        "Usable, but heavier streams may still feel a bit soft.",
+        "Rendering smoothness is dropping under load."
       ),
       health: fpsHealth
     },
